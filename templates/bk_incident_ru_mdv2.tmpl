@@ -1,0 +1,45 @@
+*{{if eq .Status "actual"}}🔥 Новый инцидент\! 🔥{{else if eq .Status "finished"}}🏁 Инцидент закончился 🏁{{else if eq .Status "closed"}}✅ Инцидент закрыт ✅{{end}} \- {{escapeMDV2 .Summary}}*
+{{if .Description}}
+*Описание причины:*
+{{escapeMDV2 .Description}}
+{{end}}
+*Начало:* {{.FromAt.Format "Jan 02, 2006 15:04 MST"}}
+{{- if not .ToAt.IsZero}}
+*Конец:* {{.ToAt.Format "Jan 02, 2006 15:04 MST"}}
+{{- end}}
+{{- if eq .Type "auto"}}
+*Подтвержден:* {{if .IsConfirmed}}Да{{else}}Нет{{end}}
+{{- if .IsConfirmed}}
+*Время подтверждения:* {{.ConfirmationTime.Format "Jan 02, 2006 15:04 MST"}}
+{{- end}}
+{{- end}}
+
+*Квартал:* {{.Quarter}}
+*Департамент:* {{if eq .Departament "internal_digital"}}Внутренний Digital{{else if eq .Departament "internal_it"}}Внутренний IT{{else if eq .Departament "external_service"}}Внешний сервис{{end}}
+{{- if .ClientAffect}}
+*Влияние на гостей:* {{escapeMDV2 .ClientAffect}}
+{{- end}}
+*Могли повлиять:* {{if eq .IsManageable "yes"}}Да{{else if eq .IsManageable "no"}}Нет{{else if eq .IsManageable "indirectly"}}Косвенно{{end}}
+*Затронутые каналы:* {{escapeMDV2 (joinWithCommas .SaleChannels)}}
+*Затронутые сервисы:* {{escapeMDV2 (joinWithCommas .TroubleServices)}}
+*Фин\. потери:* {{formatNumWithCommas .FinLosses}}
+*Тип сбоя:* {{if eq .FailureType "err_network"}}Сетевые ошибки{{else if eq .FailureType "err_acquiring"}}Ошибки эквайринга{{else if eq .FailureType "err_development"}}Ошибки разработки{{else if eq .FailureType "err_infrastructure"}}Ошибки инфраструктуры{{else if eq .FailureType "err_configuration"}}Ошибки конфигурации{{else if eq .FailureType "err_menu"}}Ошибки меню{{else if eq .FailureType "err_external"}}Внешние ошибки{{else}}Другой{{end}}
+*Связан с деплоем:* {{if .IsDeploy}}Да; Детали: [Тут]({{.DeployLink}}){{else}}Нет{{end}}
+*Даунтайм:* {{if .IsDowntime}}Да{{else}}Нет{{end}}
+{{- if .PostmortemLink}}
+*Постмортем:* [Тут]({{.PostmortemLink}})
+{{- end}}
+{{- if .Labels}}
+*Метки:* {{escapeMDV2 (joinWithCommas .Labels)}}
+{{- end}}
+{{if eq .Type "auto"}}
+*ID правила:* `{{derefStr .RuleID}}`
+*Количество совпадений:* {{.MatchingCount}}
+*Последнее совпадение:* {{.LastMatchingTime.Format "Jan 02, 2006 15:04 MST"}}
+*Данные алертов:*
+```json
+{{escapeMDV2 (prettyJSON .AlertsData)}}
+```{{end}}
+*Создал:* {{if eq .Creator "handler"}}Автоматический обработчик{{else}}{{.Creator}}{{end}}
+*Время создания:* {{.CreatedAt.Format "Jan 02, 2006 15:04 MST"}}
+*Последнее обновление:* {{.UpdatedAt.Format "Jan 02, 2006 15:04 MST"}}

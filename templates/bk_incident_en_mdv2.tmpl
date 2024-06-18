@@ -1,0 +1,45 @@
+*{{if eq .Status "actual"}}🔥 New Incident! 🔥{{else if eq .Status "finished"}}🏁 Incident Ended 🏁{{else if eq .Status "closed"}}✅ Incident Closed ✅{{end}} \- {{escapeMDV2 .Summary}}*
+{{if .Description}}
+*Cause Description:*
+{{escapeMDV2 .Description}}
+{{end}}
+*Start:* {{.FromAt.Format "Jan 02, 2006 15:04 MST"}}
+{{- if not .ToAt.IsZero}}
+*End:* {{.ToAt.Format "Jan 02, 2006 15:04 MST"}}
+{{- end}}
+{{- if eq .Type "auto"}}
+*Confirmed:* {{if .IsConfirmed}}Yes{{else}}No{{end}}
+{{- if .IsConfirmed}}
+*Confirmation Time:* {{.ConfirmationTime.Format "Jan 02, 2006 15:04 MST"}}
+{{- end}}
+{{- end}}
+
+*Quarter:* {{.Quarter}}
+*Department:* {{if eq .Departament "internal_digital"}}Internal Digital{{else if eq .Departament "internal_it"}}Internal IT{{else if eq .Departament "external_service"}}External Service{{end}}
+{{- if .ClientAffect}}
+*Impact on Clients:* {{escapeMDV2 .ClientAffect}}
+{{- end}}
+*Manageable:* {{if eq .IsManageable "yes"}}Yes{{else if eq .IsManageable "no"}}No{{else if eq .IsManageable "indirectly"}}Indirectly{{end}}
+*Affected Channels:* {{escapeMDV2 (joinWithCommas .SaleChannels)}}
+*Affected Services:* {{escapeMDV2 (joinWithCommas .TroubleServices)}}
+*Financial Losses:* {{formatNumWithCommas .FinLosses}}
+*Failure Type:* {{if eq .FailureType "err_network"}}Network Errors{{else if eq .FailureType "err_acquiring"}}Acquiring Errors{{else if eq .FailureType "err_development"}}Development Errors{{else if eq .FailureType "err_infrastructure"}}Infrastructure Errors{{else if eq .FailureType "err_configuration"}}Configuration Errors{{else if eq .FailureType "err_menu"}}Menu Errors{{else if eq .FailureType "err_external"}}External Errors{{else}}Other{{end}}
+*Related to Deployment:* {{if .IsDeploy}}Yes; Details: [Here]({{.DeployLink}}){{else}}No{{end}}
+*Downtime:* {{if .IsDowntime}}Yes{{else}}No{{end}}
+{{- if .PostmortemLink}}
+*Postmortem:* [Here]({{.PostmortemLink}})
+{{- end}}
+{{- if .Labels}}
+*Labels:* {{escapeMDV2 (joinWithCommas .Labels)}}
+{{- end}}
+{{if eq .Type "auto"}}
+*Rule ID:* `{{derefStr .RuleID}}`
+*Match Count:* {{.MatchingCount}}
+*Last Match:* {{.LastMatchingTime.Format "Jan 02, 2006 15:04 MST"}}
+*Alert Data:*
+```json
+{{escapeMDV2 (prettyJSON .AlertsData)}}
+```{{end}}
+*Created By:* {{if eq .Creator "handler"}}Automatic Handler{{else}}{{.Creator}}{{end}}
+*Creation Time:* {{.CreatedAt.Format "Jan 02, 2006 15:04 MST"}}
+*Last Updated:* {{.UpdatedAt.Format "Jan 02, 2006 15:04 MST"}}

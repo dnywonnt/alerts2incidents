@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  handler:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.handler
+    env_file:
+      - ./configs/handler.env
+    volumes:
+      - ./migrations:/app/migrations
+    restart: always
+
+  server:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.server
+    env_file:
+      - ./configs/server.env
+    volumes:
+      - ./migrations:/app/migrations
+    ports:
+      - "8080:8080"
+    restart: always
+
+  bot:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.bot
+    env_file:
+      - ./configs/bot.env
+    volumes:
+      - ./templates:/app/templates
+    restart: always
