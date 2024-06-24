@@ -2,6 +2,7 @@ package v1 // dnywonnt.me/alerts2incidents/internal/api/v1
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -83,7 +84,7 @@ func IsLDAPUserInAllowedGroup(ldapUser *ldap.Entry, allowedGroups []string) bool
 func GetLDAPUserName(ldapUser *ldap.Entry) (string, error) {
 	cn := ldapUser.GetAttributeValue("cn")
 	if cn == "" {
-		return "", fmt.Errorf("cn attribute not found for user")
+		return "", errors.New("cn attribute not found for user")
 	}
 
 	return cn, nil
@@ -95,7 +96,7 @@ func ExtractLDAPDomain(baseDn string) (string, error) {
 	prefix := "dc="
 	startIndex := strings.Index(baseDn, prefix)
 	if startIndex == -1 {
-		return "", fmt.Errorf("dc= not found in string")
+		return "", errors.New("dc= not found in string")
 	}
 
 	endIndex := strings.Index(baseDn[startIndex:], ",")
