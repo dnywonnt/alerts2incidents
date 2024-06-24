@@ -215,119 +215,189 @@ func (h *Handler) initializeCaches(ctx context.Context) {
 	}
 }
 
-// processAlerts processes incoming alerts and creates or updates incidents based on matching rules
+// processAlerts processes a batch of alerts against cached rules
 func (h *Handler) processAlerts(ctx context.Context, alerts []models.Alert) {
 	pageSize := 100
 
+	// Get the total number of rules from the cache and calculate the total number of pages needed
 	totalRules := h.rulesCache.GetTotalItems()
 	rulesTotalPages := utils.CalculatePages(totalRules, pageSize)
 
+	// Iterate through each page of cached rules
 	for i := 1; i <= rulesTotalPages; i++ {
 		cachedRules := h.rulesCache.GetItems(i, pageSize)
-
 		for _, item := range cachedRules {
+			// Type assert the cached item to a Rule and skip if the rule is muted
 			rule, ok := item.Value.(*models.Rule)
 			if !ok || (ok && rule.IsMuted) {
 				continue
 			}
-
-			// Find matching alerts for the rule
-			matchingAlerts, err := service.FindMatchingAlerts(alerts, rule)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error": err.Error(),
-				}).Error("Failed to find matching alerts")
-				continue
-			}
-
-			if matchingAlerts != nil {
-				currentTimeUTC := time.Now().UTC()
-				incident, exists := h.getIncidentFromCacheForRule(rule.ID)
-
-				// Update existing incident if it matches the rule and is within its lifetime
-				if exists && time.Since(incident.CreatedAt) <= rule.IncidentLifeTime {
-					log.WithFields(log.Fields{
-						"id":               incident.ID,
-						"ruleID":           rule.ID,
-						"matchingCount":    incident.MatchingCount,
-						"incidentLifeTime": rule.IncidentLifeTime.String(),
-					}).Info("The incident already exists for the rule; updating info")
-
-					incident.MatchingCount += 1
-					incident.LastMatchingTime = currentTimeUTC
-					incident.UpdatedAt = currentTimeUTC
-
-					if err := h.incidentsRepo.UpdateIncident(ctx, incident); err != nil {
-						log.WithFields(log.Fields{
-							"error": err.Error(),
-						}).Error("Failed to update incident in the database")
-					}
-					continue
-				}
-
-				// Create a new incident if no existing incident is found
-				alertsData, err := json.Marshal(matchingAlerts)
-				if err != nil {
-					log.WithFields(log.Fields{
-						"error": err.Error(),
-					}).Error("Failed to marshal alerts for a new incident")
-					continue
-				}
-
-				zeroTime := time.Time{}
-				newIncident := &models.Incident{
-					ID:               uuid.NewString(),
-					Type:             "auto",
-					Status:           "actual",
-					Summary:          rule.SetIncidentSummary,
-					Description:      rule.SetIncidentDescription,
-					FromAt:           currentTimeUTC,
-					ToAt:             zeroTime,
-					IsConfirmed:      false,
-					ConfirmationTime: zeroTime,
-					Quarter:          utils.GetCurrentQuarter(),
-					Departament:      rule.SetIncidentDepartament,
-					ClientAffect:     rule.SetIncidentClientAffect,
-					IsManageable:     rule.SetIncidentIsManageable,
-					SaleChannels:     rule.SetIncidentSaleChannels,
-					TroubleServices:  rule.SetIncidentTroubleServices,
-					FinLosses:        0,
-					FailureType:      rule.SetIncidentFailureType,
-					DeployLink:       "",
-					Labels:           rule.SetIncidentLabels,
-					IsDowntime:       rule.SetIncidentIsDowntime,
-					PostmortemLink:   "",
-					Creator:          "handler",
-					RuleID:           &rule.ID,
-					MatchingCount:    1,
-					LastMatchingTime: currentTimeUTC,
-					AlertsData:       string(alertsData),
-					CreatedAt:        currentTimeUTC,
-					UpdatedAt:        currentTimeUTC,
-				}
-
-				if err := newIncident.Validate(); err != nil {
-					log.WithFields(log.Fields{
-						"error": err.Error(),
-					}).Error("Failed to validate the incident model")
-					continue
-				}
-
-				if err := h.incidentsRepo.CreateIncident(ctx, newIncident); err != nil {
-					log.WithFields(log.Fields{
-						"error": err.Error(),
-						"id":    newIncident.ID,
-					}).Error("Failed to create a new incident in the database")
-					continue
-				}
-
-				log.WithFields(log.Fields{
-					"id":     newIncident.ID,
-					"ruleID": rule.ID,
-				}).Info("A new incident has been detected")
-			}
+			// Process each valid rule with the alerts
+			h.processRule(ctx, alerts, rule)
 		}
 	}
+}
+
+// processRule manages incidents based on incoming alerts and a specific rule.
+func (h *Handler) processRule(ctx context.Context, alerts []models.Alert, rule *models.Rule) {
+	// Find alerts matching the rule
+	matchingAlerts, err := service.FindMatchingAlerts(alerts, rule)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Failed to find matching alerts")
+		return
+	}
+
+	// Get the latest incident for the rule
+	incident, exists := h.getLatestIncidentFromCacheForRule(rule)
+
+	if matchingAlerts != nil {
+		if exists {
+			// If an incident exists and is within its lifetime and not closed, update it
+			if time.Since(incident.CreatedAt) <= rule.IncidentLifeTime && incident.Status != "closed" {
+				h.updateIncident(ctx, incident, rule)
+			} else {
+				// If the incident is active but outside its lifetime, finish it
+				if incident.Status == "actual" {
+					h.finishIncident(ctx, incident, rule)
+				}
+				// Create a new incident for the matching alerts
+				h.createIncident(ctx, matchingAlerts, rule)
+			}
+		} else {
+			// If no existing incident, create a new one for the matching alerts
+			h.createIncident(ctx, matchingAlerts, rule)
+		}
+	} else if exists && time.Since(incident.LastMatchingTime) >= rule.IncidentFinishingInterval && incident.Status == "actual" {
+		// If no matching alerts and the existing incident is stale, finish it
+		h.finishIncident(ctx, incident, rule)
+	}
+}
+
+// updateIncident updates an existing incident with new matching alert information
+func (h *Handler) updateIncident(ctx context.Context, incident *models.Incident, rule *models.Rule) {
+	log.WithFields(log.Fields{
+		"id":     incident.ID,
+		"ruleID": rule.ID,
+	}).Info("The incident already exists; updating info")
+
+	currentTimeUTC := time.Now().UTC()
+
+	// Update incident details
+	incident.MatchingCount += 1
+	incident.LastMatchingTime = currentTimeUTC
+	incident.UpdatedAt = currentTimeUTC
+
+	// Reopen incident if it was finished
+	if incident.Status == "finished" {
+		log.WithFields(log.Fields{
+			"id":     incident.ID,
+			"ruleID": rule.ID,
+		}).Info("Incident is being reopened due to new matching alerts")
+
+		incident.Status = "actual"
+		incident.ToAt = time.Time{}
+	}
+
+	// Persist the updated incident to the repository
+	if err := h.incidentsRepo.UpdateIncident(ctx, incident); err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Failed to update incident in the database")
+	}
+}
+
+// finishIncident updates the status of the given incident to "finished" and persists the update to the repository.
+// It logs the action with incident and rule IDs, indicating the reason for finishing the incident.
+func (h *Handler) finishIncident(ctx context.Context, incident *models.Incident, rule *models.Rule) {
+	log.WithFields(log.Fields{
+		"id":     incident.ID,
+		"ruleID": rule.ID,
+	}).Info("Incident is being finished due to no matching alerts or expiration of incident's lifetime")
+
+	currentTimeUTC := time.Now().UTC()
+
+	// Update incident status to finished
+	incident.Status = "finished"
+	incident.ToAt = currentTimeUTC
+	incident.UpdatedAt = currentTimeUTC
+
+	// Persist the updated incident to the repository
+	if err := h.incidentsRepo.UpdateIncident(ctx, incident); err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Failed to update incident in the database")
+	}
+}
+
+// createIncident creates a new incident based on matching alerts and rule information
+func (h *Handler) createIncident(ctx context.Context, matchingAlerts []models.Alert, rule *models.Rule) {
+	// Serialize the matching alerts to JSON
+	alertsData, err := json.Marshal(matchingAlerts)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Failed to marshal alerts for a new incident")
+		return
+	}
+
+	currentTimeUTC := time.Now().UTC()
+	zeroTime := time.Time{}
+
+	// Create a new incident object with the relevant details
+	newIncident := &models.Incident{
+		ID:               uuid.NewString(),
+		Type:             "auto",
+		Status:           "actual",
+		Summary:          rule.SetIncidentSummary,
+		Description:      rule.SetIncidentDescription,
+		FromAt:           currentTimeUTC,
+		ToAt:             zeroTime,
+		IsConfirmed:      false,
+		ConfirmationTime: zeroTime,
+		Quarter:          utils.GetCurrentQuarter(),
+		Departament:      rule.SetIncidentDepartament,
+		ClientAffect:     rule.SetIncidentClientAffect,
+		IsManageable:     rule.SetIncidentIsManageable,
+		SaleChannels:     rule.SetIncidentSaleChannels,
+		TroubleServices:  rule.SetIncidentTroubleServices,
+		FinLosses:        0,
+		FailureType:      rule.SetIncidentFailureType,
+		DeployLink:       "",
+		Labels:           rule.SetIncidentLabels,
+		IsDowntime:       rule.SetIncidentIsDowntime,
+		PostmortemLink:   "",
+		Creator:          "handler",
+		RuleID:           &rule.ID,
+		MatchingCount:    1,
+		LastMatchingTime: currentTimeUTC,
+		AlertsData:       string(alertsData),
+		CreatedAt:        currentTimeUTC,
+		UpdatedAt:        currentTimeUTC,
+	}
+
+	// Validate the new incident model
+	if err := newIncident.Validate(); err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Failed to validate the incident model")
+		return
+	}
+
+	// Persist the new incident to the repository
+	if err := h.incidentsRepo.CreateIncident(ctx, newIncident); err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+			"id":    newIncident.ID,
+		}).Error("Failed to create a new incident in the database")
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"id":     newIncident.ID,
+		"ruleID": rule.ID,
+	}).Info("A new incident has been detected")
 }
 
 // updateIncidentsCache listens for notifications and updates the incidents cache accordingly
@@ -383,12 +453,13 @@ func updateCacheFromNotification(ctx context.Context, cache *cache.Cache, notifi
 	return nil
 }
 
-// getIncidentFromCacheForRule retrieves an incident from the cache based on the rule ID
-func (h *Handler) getIncidentFromCacheForRule(ruleID string) (*models.Incident, bool) {
+// getLatestIncidentFromCacheForRule retrieves the latest incident from the cache that matches the given rule.
+// It returns the incident and true if found, otherwise returns nil and false.
+func (h *Handler) getLatestIncidentFromCacheForRule(rule *models.Rule) (*models.Incident, bool) {
 	items := h.incidentsCache.GetAllItems()
 
 	for _, item := range items {
-		if incident, ok := item.Value.(*models.Incident); ok && (incident.RuleID != nil && *incident.RuleID == ruleID) {
+		if incident, ok := item.Value.(*models.Incident); ok && (incident.RuleID != nil && *incident.RuleID == rule.ID) {
 			return incident, true
 		}
 	}
