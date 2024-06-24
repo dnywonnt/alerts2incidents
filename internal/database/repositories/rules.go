@@ -18,18 +18,18 @@ const (
 	insertRuleQuery = `
 		INSERT INTO a2i_rules (
 			id, is_muted, description, alerts_summary_conditions, alerts_activity_interval_conditions, 
-			incident_life_time, set_incident_summary, set_incident_description, set_incident_departament, 
+			incident_life_time, incident_finishing_interval, set_incident_summary, set_incident_description, set_incident_departament, 
 			set_incident_client_affect, set_incident_is_manageable, set_incident_sale_channels, 
 			set_incident_trouble_services, set_incident_failure_type, set_incident_labels, 
 			set_incident_is_downtime, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 	`
 
 	// Query for selecting a rule by ID
 	selectRuleQuery = `
 		SELECT id, is_muted, description, alerts_summary_conditions, alerts_activity_interval_conditions, 
-			incident_life_time, set_incident_summary, set_incident_description, set_incident_departament, 
+			incident_life_time, incident_finishing_interval, set_incident_summary, set_incident_description, set_incident_departament, 
 			set_incident_client_affect, set_incident_is_manageable, set_incident_sale_channels, 
 			set_incident_trouble_services, set_incident_failure_type, set_incident_labels, 
 			set_incident_is_downtime, created_at, updated_at
@@ -41,12 +41,12 @@ const (
 	updateRuleQuery = `
 		UPDATE a2i_rules
 		SET is_muted = $1, description = $2, alerts_summary_conditions = $3, alerts_activity_interval_conditions = $4, 
-			incident_life_time = $5, set_incident_summary = $6, set_incident_description = $7, 
-			set_incident_departament = $8, set_incident_client_affect = $9, set_incident_is_manageable = $10, 
-			set_incident_sale_channels = $11, set_incident_trouble_services = $12, set_incident_failure_type = $13, 
-			set_incident_labels = $14, set_incident_is_downtime = $15, 
-			updated_at = $16
-		WHERE id = $17
+			incident_life_time = $5, incident_finishing_interval = $6, set_incident_summary = $7, set_incident_description = $8, 
+			set_incident_departament = $9, set_incident_client_affect = $10, set_incident_is_manageable = $11, 
+			set_incident_sale_channels = $12, set_incident_trouble_services = $13, set_incident_failure_type = $14, 
+			set_incident_labels = $15, set_incident_is_downtime = $16, 
+			updated_at = $17
+		WHERE id = $18
 	`
 
 	// Query for deleting a rule by ID
@@ -77,7 +77,7 @@ func (rr *RulesRepository) CreateRule(ctx context.Context, rule *models.Rule) er
 		ctx,
 		insertRuleQuery,
 		rule.ID, rule.IsMuted, rule.Description, rule.AlertsSummaryConditions, rule.AlertsActivityIntervalConditions,
-		rule.IncidentLifeTime, rule.SetIncidentSummary, rule.SetIncidentDescription, rule.SetIncidentDepartament,
+		rule.IncidentLifeTime, rule.IncidentFinishingInterval, rule.SetIncidentSummary, rule.SetIncidentDescription, rule.SetIncidentDepartament,
 		rule.SetIncidentClientAffect, rule.SetIncidentIsManageable, rule.SetIncidentSaleChannels, rule.SetIncidentTroubleServices,
 		rule.SetIncidentFailureType, rule.SetIncidentLabels, rule.SetIncidentIsDowntime, rule.CreatedAt, rule.UpdatedAt,
 	); err != nil {
@@ -100,7 +100,7 @@ func (rr *RulesRepository) GetRule(ctx context.Context, id string) (*models.Rule
 	rule := &models.Rule{}
 	if err := rr.dbPool.QueryRow(ctx, selectRuleQuery, id).Scan(
 		&rule.ID, &rule.IsMuted, &rule.Description, &rule.AlertsSummaryConditions, &rule.AlertsActivityIntervalConditions,
-		&rule.IncidentLifeTime, &rule.SetIncidentSummary, &rule.SetIncidentDescription, &rule.SetIncidentDepartament,
+		&rule.IncidentLifeTime, &rule.IncidentFinishingInterval, &rule.SetIncidentSummary, &rule.SetIncidentDescription, &rule.SetIncidentDepartament,
 		&rule.SetIncidentClientAffect, &rule.SetIncidentIsManageable, &rule.SetIncidentSaleChannels, &rule.SetIncidentTroubleServices,
 		&rule.SetIncidentFailureType, &rule.SetIncidentLabels, &rule.SetIncidentIsDowntime, &rule.CreatedAt, &rule.UpdatedAt,
 	); err != nil {
@@ -124,7 +124,7 @@ func (rr *RulesRepository) UpdateRule(ctx context.Context, rule *models.Rule) er
 		ctx,
 		updateRuleQuery,
 		rule.IsMuted, rule.Description, rule.AlertsSummaryConditions, rule.AlertsActivityIntervalConditions,
-		rule.IncidentLifeTime, rule.SetIncidentSummary, rule.SetIncidentDescription, rule.SetIncidentDepartament,
+		rule.IncidentLifeTime, rule.IncidentFinishingInterval, rule.SetIncidentSummary, rule.SetIncidentDescription, rule.SetIncidentDepartament,
 		rule.SetIncidentClientAffect, rule.SetIncidentIsManageable, rule.SetIncidentSaleChannels, rule.SetIncidentTroubleServices,
 		rule.SetIncidentFailureType, rule.SetIncidentLabels, rule.SetIncidentIsDowntime, rule.UpdatedAt, rule.ID,
 	); err != nil {
@@ -180,7 +180,7 @@ func (rr *RulesRepository) GetRules(ctx context.Context, filterBy map[string]int
 		rule := &models.Rule{}
 		if err := rows.Scan(
 			&rule.ID, &rule.IsMuted, &rule.Description, &rule.AlertsSummaryConditions, &rule.AlertsActivityIntervalConditions,
-			&rule.IncidentLifeTime, &rule.SetIncidentSummary, &rule.SetIncidentDescription, &rule.SetIncidentDepartament,
+			&rule.IncidentLifeTime, &rule.IncidentFinishingInterval, &rule.SetIncidentSummary, &rule.SetIncidentDescription, &rule.SetIncidentDepartament,
 			&rule.SetIncidentClientAffect, &rule.SetIncidentIsManageable, &rule.SetIncidentSaleChannels, &rule.SetIncidentTroubleServices,
 			&rule.SetIncidentFailureType, &rule.SetIncidentLabels, &rule.SetIncidentIsDowntime, &rule.CreatedAt, &rule.UpdatedAt,
 		); err != nil {
@@ -225,7 +225,7 @@ func (rr *RulesRepository) GetTotalRules(ctx context.Context, filterBy map[strin
 // buildGetQueryForRules builds a dynamic query for retrieving rules based on filters and pagination
 func buildGetQueryForRules(filterBy map[string]interface{}, sortBy string, sortOrder string, pageNum int, pageSize int, startTime time.Time, endTime time.Time) (string, []interface{}) {
 	baseQuery := `SELECT id, is_muted, description, alerts_summary_conditions, alerts_activity_interval_conditions,
-		incident_life_time, set_incident_summary, set_incident_description, set_incident_departament,
+		incident_life_time, incident_finishing_interval, set_incident_summary, set_incident_description, set_incident_departament,
 		set_incident_client_affect, set_incident_is_manageable, set_incident_sale_channels, set_incident_trouble_services,
 		set_incident_failure_type, set_incident_labels, set_incident_is_downtime,
 		created_at, updated_at FROM a2i_rules WHERE 1 = 1`
