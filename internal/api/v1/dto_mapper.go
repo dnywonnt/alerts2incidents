@@ -121,6 +121,7 @@ func MapCreateRuleDTOToModel(dto *dtos.CreateRuleDTO) (*models.Rule, error) {
 		AlertsSummaryConditions:          dto.AlertsSummaryConditions,          // Map summary conditions from DTO.
 		AlertsActivityIntervalConditions: dto.AlertsActivityIntervalConditions, // Map activity interval conditions from DTO.
 		IncidentLifeTime:                 dto.IncidentLifeTime,                 // Map the incident lifetime from DTO.
+		IncidentFinishingInterval:        dto.IncidentFinishingInterval,        // Map the incident finishing interval from DTO.
 		SetIncidentSummary:               dto.SetIncidentSummary,               // Map the incident summary to be set from DTO.
 		SetIncidentDescription:           dto.SetIncidentDescription,           // Map the incident description to be set from DTO.
 		SetIncidentDepartament:           dto.SetIncidentDepartament,           // Map the department from DTO.
@@ -153,6 +154,7 @@ func MapUpdateRuleDTOToModel(dto *dtos.UpdateRuleDTO, rule *models.Rule) error {
 	updateField(dto.AlertsSummaryConditions, &rule.AlertsSummaryConditions, &anyFieldUpdated)
 	updateField(dto.AlertsActivityIntervalConditions, &rule.AlertsActivityIntervalConditions, &anyFieldUpdated)
 	updateField(dto.IncidentLifeTime, &rule.IncidentLifeTime, &anyFieldUpdated)
+	updateField(dto.IncidentFinishingInterval, &rule.IncidentFinishingInterval, &anyFieldUpdated)
 	updateField(dto.SetIncidentSummary, &rule.SetIncidentSummary, &anyFieldUpdated)
 	updateField(dto.SetIncidentDescription, &rule.SetIncidentDescription, &anyFieldUpdated)
 	updateField(dto.SetIncidentDepartament, &rule.SetIncidentDepartament, &anyFieldUpdated)
