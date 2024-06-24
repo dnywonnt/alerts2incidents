@@ -9,6 +9,7 @@ type CreateRuleDTO struct {
 	AlertsSummaryConditions          []string        `json:"alerts_summary_conditions"`           // Conditions that summarize alerts.
 	AlertsActivityIntervalConditions []time.Duration `json:"alerts_activity_interval_conditions"` // List of time durations for alert activity intervals.
 	IncidentLifeTime                 time.Duration   `json:"incident_life_time"`                  // Duration for which an incident is considered active.
+	IncidentFinishingInterval        time.Duration   `json:"incident_finishing_interval"`         // Time interval after which the incident is considered finished.
 	SetIncidentSummary               string          `json:"set_incident_summary"`                // Summary to be set for an incident.
 	SetIncidentDescription           string          `json:"set_incident_description"`            // Description to be set for an incident.
 	SetIncidentDepartament           string          `json:"set_incident_departament"`            // Department responsible for the incident.
@@ -28,6 +29,7 @@ type UpdateRuleDTO struct {
 	AlertsSummaryConditions          *[]string        `json:"alerts_summary_conditions,omitempty"`           // Optional update to the conditions that summarize alerts.
 	AlertsActivityIntervalConditions *[]time.Duration `json:"alerts_activity_interval_conditions,omitempty"` // Optional update to the list of time durations for alert activity intervals.
 	IncidentLifeTime                 *time.Duration   `json:"incident_life_time,omitempty"`                  // Optional update to the duration for which an incident is considered active.
+	IncidentFinishingInterval        *time.Duration   `json:"incident_finishing_interval,omitempty"`         // Optional update to the time interval after which the incident is considered finished.
 	SetIncidentSummary               *string          `json:"set_incident_summary,omitempty"`                // Optional update to the summary set for an incident.
 	SetIncidentDescription           *string          `json:"set_incident_description,omitempty"`            // Optional update to the description set for an incident.
 	SetIncidentDepartament           *string          `json:"set_incident_departament,omitempty"`            // Optional update to the department responsible for the incident.
